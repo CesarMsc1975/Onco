@@ -1,0 +1,140 @@
+
+import React, { useState } from 'react';
+import { buildPatientResource } from "./fhir/buildPatient";
+
+function App() {
+  // Campos requeridos según PatientLE
+  const [id, setId] = useState("");
+  const [identifierValue, setIdentifierValue] = useState("");
+  const [identifierTypeCode, setIdentifierTypeCode] = useState("");
+  const [identifierTypeSystem] = useState("https://hl7chile.cl/fhir/ig/clcore/CodeSystem/CSTipoIdentificador");
+  const [canValidate, setCanValidate] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validateResult, setValidateResult] = useState(null); // { ok: boolean, summary: string }
+  const [validateOutcome, setValidateOutcome] = useState(null); // OperationOutcome completo
+    // ValueSet: Tipo Identificador (VSTipoIdentificador)
+    const tipoIdentificadorOptions = [
+      { code: "01", display: "RUN" },
+      { code: "02", display: "RUN Provisorio" },
+      { code: "03", display: "RUN Madre" },
+      { code: "04", display: "Número Folio" },
+      { code: "05", display: "PPN" },
+      { code: "06", display: "Documento de identificación del país de origen" },
+      { code: "07", display: "Acta de nacimiento del país de origen" },
+      { code: "08", display: "NIP" },
+      { code: "09", display: "NIC" },
+      { code: "10", display: "IPA" },
+      { code: "11", display: "IPE" },
+      { code: "12", display: "Número de Ficha Clínica Sistema Local" },
+      { code: "13", display: "RNPI" },
+      { code: "14", display: "OTRO" }
+    ];
+  const [identifierPaisEmision, setIdentifierPaisEmision] = useState("");
+  const [nombreOficialFamily, setNombreOficialFamily] = useState("");
+  const [nombreOficialSegundoApellido, setNombreOficialSegundoApellido] = useState("");
+  const [nombreOficialGiven, setNombreOficialGiven] = useState("");
+  const [nombreOficialUse, setNombreOficialUse] = useState("official");
+  const [telecomSystem, setTelecomSystem] = useState("phone");
+  const [telecomValue, setTelecomValue] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [deceasedBoolean, setDeceasedBoolean] = useState(false);
+  const [nacionalidad, setNacionalidad] = useState("");
+  const [paisOrigen, setPaisOrigen] = useState("");
+
+    // ValueSet: Códigos de Países (CodPais, ISO 3166-1)
+    // Lista representativa, ampliar según necesidad
+    const paisesOptions = [
+      { code: "032", display: "Argentina" },
+      { code: "068", display: "Bolivia" },
+      { code: "076", display: "Brasil" },
+      { code: "152", display: "Chile" },
+      { code: "170", display: "Colombia" },
+      { code: "218", display: "Ecuador" },
+      { code: "484", display: "México" },
+      { code: "604", display: "Perú" },
+      { code: "858", display: "Uruguay" },
+      { code: "862", display: "Venezuela" },
+      { code: "840", display: "Estados Unidos" },
+      { code: "724", display: "España" },
+      { code: "250", display: "Francia" },
+      { code: "380", display: "Italia" },
+      { code: "826", display: "Reino Unido" }
+    ];
+    // Si se agregan más campos code/CodeableConcept, seguir este patrón y asociar el ValueSet correspondiente.
+  const [pueblosOriginariosPerteneciente, setPueblosOriginariosPerteneciente] = useState(false);
+  const [identidadGenero, setIdentidadGenero] = useState("");
+  const [jsonPatient, setJsonPatient] = useState(null);
+
+    // ValueSet: Identidad de Género (VSIdentidaddeGenero)
+    const identidadGeneroOptions = [
+      { code: "1", display: "Masculino" },
+      { code: "2", display: "Femenina" },
+      { code: "3", display: "Transgénero Masculino" },
+      { code: "4", display: "Transgénero Femenina" },
+      { code: "5", display: "No binarie" },
+      { code: "6", display: "Otra" },
+      { code: "7", display: "No Revelado" }
+    ];
+
+ 
+  const handleGenerarPatient = () => {
+  const handleValidatePatient = async () => {
+
+  {/* JSON preview */}
+  {jsonPatient && (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <strong>JSON generado</strong>
+        <button
+          type="button"
+          onClick={() => navigator.clipboard?.writeText(JSON.stringify(jsonPatient, null, 2))}
+          style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #ddd", cursor: "pointer" }}
+        >
+          Copiar
+        </button>
+      </div>
+      <pre style={{ marginTop: 10, background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
+        {JSON.stringify(jsonPatient, null, 2)}
+      </pre>
+    </div>
+  )}
+
+  {/* “CSS” mínimo para inputs */}
+  <style>{`
+    input, select {
+      width: 100%;
+      padding: 10px 10px;
+      border-radius: 10px;
+      border: 1px solid #dcdcdc;
+      outline: none;
+      box-sizing: border-box;
+    }
+    input:focus, select:focus {
+      border-color: #94a3b8;
+      box-shadow: 0 0 0 3px rgba(148,163,184,.25);
+    }
+    fieldset { background: #fafafa; }
+  `}</style>
+</form>
+
+     
+
+{/* RESULTADO VALIDACIÓN */}
+{validateResult && (
+  <div style={{ marginTop: 15, textAlign: "left" }}>
+    <strong>{validateResult.summary}</strong>
+  </div>
+)}
+
+{validateOutcome && (
+  <pre style={{ marginTop: 10, textAlign: "left", background: "#111", padding: 10, borderRadius: 6, overflow: "auto" }}>
+    {JSON.stringify(validateOutcome, null, 2)}
+  </pre>
+)}
+
+      </header>
+    </div>
+  );
+}
+
+export default App;
