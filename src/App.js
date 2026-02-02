@@ -8,6 +8,9 @@ function App() {
   // 🔹 TODOS LOS useState PRIMERO
   const [jsonPatient, setJsonPatient] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [mode, setMode] = useState("create"); // "create" | "edit"
+  const [serverPatient, setServerPatient] = useState(null); // Patient completo desde server
+
   
  
   // 🔹 Después constantes derivadas
@@ -15,7 +18,7 @@ function App() {
 
   // 🔹 Después funciones
  const [createResult, setCreateResult] = useState(null);
-const [createResponseRaw, setCreateResponseRaw] = useState("");
+ const [createResponseRaw, setCreateResponseRaw] = useState("");
 // isCreating ya lo tienes
 
 const handleCreateFicha = async () => {
@@ -115,10 +118,13 @@ const handleCreateFicha = async () => {
   const [foundBundle, setFoundBundle] = useState(null);   // Bundle full response (opcional)
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
-   const handleSearchPatient = async () => {
+  
+  const handleSearchPatient = async () => {
 
   setIsSearching(true);
   setSearchError(null);
+ 
+
 
   try {
     const params = new URLSearchParams();
@@ -145,13 +151,27 @@ const handleCreateFicha = async () => {
       entries.find(e => e?.resource?.resourceType === "Patient")?.resource || null;
 
     if (firstPatient) {
-      setFoundPatient(firstPatient);
-      setScreen("view");
+  // ✅ Existe -> modo EDIT
+      setMode("edit");
+      setServerPatient(firstPatient);
+      loadFormFromPatient(firstPatient);
+      setScreen("create");
+
     } else {
+  // ✅ No existe -> modo CREATE desde 0
+      setMode("create");
+      setServerPatient(null);
+      handleLimpiar();
+      setScreen("create");
+
+
+  // opcional: prellenar con lo que buscó
       if (searchFamily.trim()) setNombreOficialFamily(searchFamily.trim());
       if (searchIdentifier.trim()) setIdentifierValue(searchIdentifier.trim());
+
       setScreen("create");
     }
+
 
   } catch (e) {
     setSearchError("No se pudo consultar el servidor (CORS/red/proxy).");
@@ -353,6 +373,83 @@ const handleCreateFicha = async () => {
     setValidateOutcome(null);
   };
 
+const loadFormFromPatient = (p) => {
+  // ---------- helpers ----------
+  const getExt = (arr, url) => (Array.isArray(arr) ? arr.find(e => e?.url === url) : null);
+
+  const getCCCode = (ext) =>
+    ext?.valueCodeableConcept?.coding?.[0]?.code || "";
+
+  // URLs exactas según tu ejemplo
+  const URL_IDENTIDAD_GENERO = "https://hl7chile.cl/fhir/ig/clcore/StructureDefinition/IdentidadDeGenero";
+  const URL_NACIONALIDAD     = "https://hl7chile.cl/fhir/ig/clcore/StructureDefinition/nacionalidad";
+  const URL_PAIS_ORIGEN      = "https://interoperabilidad.minsal.cl/fhir/ig/quirurgico/StructureDefinition/PaisOrigenMPI";
+  const URL_PPO_PERTENECE    = "https://interoperabilidad.minsal.cl/fhir/ig/quirurgico/StructureDefinition/PueblosOriginariosPerteneciente";
+
+  const URL_SEGUNDO_APELLIDO = "https://hl7chile.cl/fhir/ig/clcore/StructureDefinition/SegundoApellido";
+  const URL_CODIGO_PAISES    = "https://hl7chile.cl/fhir/ig/clcore/StructureDefinition/CodigoPaises";
+
+  // ---------- extensiones raíz Patient.extension ----------
+  const rootExt = Array.isArray(p?.extension) ? p.extension : [];
+
+  const extIdentidad = getExt(rootExt, URL_IDENTIDAD_GENERO);
+  setIdentidadGenero(getCCCode(extIdentidad)); // ej: "1"
+
+  const extNac = getExt(rootExt, URL_NACIONALIDAD);
+  setNacionalidad(getCCCode(extNac)); // ej: "152"
+
+  const extPaisOrigen = getExt(rootExt, URL_PAIS_ORIGEN);
+  setPaisOrigen(getCCCode(extPaisOrigen)); // ej: "152"
+
+  const extPpo = getExt(rootExt, URL_PPO_PERTENECE);
+  setPueblosOriginariosPerteneciente(!!extPpo?.valueBoolean); // false si no está o si viene false
+
+  // ---------- identifier ----------
+  const ident = Array.isArray(p?.identifier) ? p.identifier[0] : null;
+
+  setIdentifierValue(ident?.value || "");
+
+  // type.coding[0].code
+  const typeCode = ident?.type?.coding?.[0]?.code || "";
+  setIdentifierTypeCode(typeCode);
+
+  // País emisión dentro de identifier.type.extension[CodigoPaises]
+  const typeExt = Array.isArray(ident?.type?.extension) ? ident.type.extension : [];
+  const extCodPais = getExt(typeExt, URL_CODIGO_PAISES);
+  const paisEmision = getCCCode(extCodPais); // ej: "152"
+  setIdentifierPaisEmision(paisEmision);
+
+  // ---------- name ----------
+  const name = Array.isArray(p?.name) ? p.name.find(n => n?.use === "official") || p.name[0] : null;
+
+  setNombreOficialFamily(name?.family || "");
+
+  // Segundo apellido está en name._family.extension[SegundoApellido]
+  const famExtArr = Array.isArray(name?._family?.extension) ? name._family.extension : [];
+  const extSegundo = getExt(famExtArr, URL_SEGUNDO_APELLIDO);
+  setNombreOficialSegundoApellido(extSegundo?.valueString || "");
+
+  // given array
+  const givenArr = Array.isArray(name?.given) ? name.given : [];
+  setNombreOficialGiven(givenArr.join(" ").trim());
+
+  // ---------- básicos ----------
+  setGender(p?.gender || "");
+  setBirthDate(p?.birthDate || "");
+
+  if (typeof p?.deceasedBoolean === "boolean") setDeceasedBoolean(p.deceasedBoolean);
+  else setDeceasedBoolean(false);
+
+  // telecom (si existe)
+  const telecom = Array.isArray(p?.telecom) ? p.telecom[0] : null;
+  setTelecomSystem(telecom?.system || "phone");
+  setTelecomValue(telecom?.value || "");
+
+  // para que el preview muestre lo traído del server (opcional)
+  setJsonPatient(p);
+};
+
+  
 return (
   <div className="App">
     <header className="App-header">
@@ -432,7 +529,9 @@ return (
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
         <div>
-          <h3 style={{ margin: 0 }}>Paciente (MINSALPaciente)</h3>
+          <h3 style={{ margin: 0 }}>
+             {mode === "edit" ? "Paciente encontrado (editar)" : "Nuevo paciente"}
+          </h3>
           <div style={{ fontSize: 12, opacity: 0.75 }}>
             Campos requeridos + extensiones
           </div>
@@ -618,20 +717,12 @@ return (
 
     {/* 👇 BOTÓN CREAR FICHA VA AQUÍ */}
     <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-      <button
-        type="button"
-        onClick={handleCreateFicha}
-        disabled={isCreating}
-        style={{
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: "1px solid #ddd",
-          cursor: "pointer",
-          opacity: (!jsonPatient || isCreating) ? 0.6 : 1
-        }}
-      >
-        {isCreating ? "Creando..." : "Crear ficha"}
-      </button>
+      {mode === "create" && (
+        <button type="button" onClick={handleCreateFicha} disabled={isCreating || !jsonPatient}>
+          {isCreating ? "Creando..." : "Crear ficha"}
+        </button>
+      )}
+
       
       {createResult && (
   <div style={{ marginTop: 12, padding: 10, borderRadius: 10, background: "#f3f4f6", color: "#111" }}>
