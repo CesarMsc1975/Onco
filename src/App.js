@@ -10,6 +10,7 @@ function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [mode, setMode] = useState("create"); // "create" | "edit"
   const [serverPatient, setServerPatient] = useState(null); // Patient completo desde server
+  const [activeTab, setActiveTab] = useState("patient"); // "patient" | "tnm"
 
   
  
@@ -512,8 +513,101 @@ return (
       ========================== */}
      {screen === "create" && (
   <>
-    <h2>Formulario PatientLE (campos requeridos)</h2>
+    {/* Tabs */}
+  <div style={{ maxWidth: 900, margin: "0 auto 12px", display: "flex", gap: 8 }}>
+  <button
+    type="button"
+    onClick={() => setActiveTab("patient")}
+    style={{
+      padding: "8px 12px",
+      borderRadius: 12,
+      border: "1px solid #ddd",
+      cursor: "pointer",
+      background: activeTab === "patient" ? "#111827" : "#fff",
+      color: activeTab === "patient" ? "#fff" : "#111"
+    }}
+  >
+    Paciente
+  </button>
 
+  <button
+    type="button"
+    onClick={() => setActiveTab("tnm")}
+    style={{
+      padding: "8px 12px",
+      borderRadius: 12,
+      border: "1px solid #ddd",
+      cursor: "pointer",
+      background: activeTab === "tnm" ? "#111827" : "#fff",
+      color: activeTab === "tnm" ? "#fff" : "#111"
+    }}
+  >
+    Categoría TNM
+  </button>
+    </div>
+  {activeTab === "tnm" && (
+  <div
+    style={{
+      maxWidth: 900,
+      margin: "0 auto",
+      background: "#fff",
+      color: "#111",
+      padding: 18,
+      borderRadius: 12,
+      boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
+    }}
+  >
+    <h3 style={{ marginTop: 0 }}>Categoría TNM</h3>
+    <p style={{ marginTop: 6, opacity: 0.8 }}>
+      Aquí vamos a registrar la categoría TNM del paciente (T, N, M, estadio, fecha, método, etc.).
+    </p>
+
+    {/* Placeholder inicial */}
+    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 10, alignItems: "center" }}>
+      <label>T</label>
+      <select defaultValue="">
+        <option value="">Seleccione...</option>
+        <option value="T0">T0</option>
+        <option value="Tis">Tis</option>
+        <option value="T1">T1</option>
+        <option value="T2">T2</option>
+        <option value="T3">T3</option>
+        <option value="T4">T4</option>
+      </select>
+
+      <label>N</label>
+      <select defaultValue="">
+        <option value="">Seleccione...</option>
+        <option value="N0">N0</option>
+        <option value="N1">N1</option>
+        <option value="N2">N2</option>
+        <option value="N3">N3</option>
+      </select>
+
+      <label>M</label>
+      <select defaultValue="">
+        <option value="">Seleccione...</option>
+        <option value="M0">M0</option>
+        <option value="M1">M1</option>
+      </select>
+
+      <label>Fecha</label>
+      <input type="date" />
+    </div>
+
+    <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between" }}>
+      <button type="button" onClick={() => setActiveTab("patient")}>
+        ← Volver a Paciente
+      </button>
+
+      <button type="button" disabled style={{ opacity: 0.6 }}>
+        Guardar TNM (próximo paso)
+      </button>
+    </div>
+  </div>
+)}
+
+  {activeTab === "patient" && (
     <form
       onSubmit={(e) => { e.preventDefault(); handleGenerarPatient(); }}
       style={{
@@ -813,6 +907,7 @@ return (
         fieldset { background: #fafafa; }
       `}</style>
     </form>
+  )}
   </>
 )}
 
