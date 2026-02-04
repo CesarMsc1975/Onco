@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+
 import { buildPatientResource } from "./fhir/buildPatient";
 
 function App() {
@@ -11,8 +12,15 @@ function App() {
   const [mode, setMode] = useState("create"); // "create" | "edit"
   const [serverPatient, setServerPatient] = useState(null); // Patient completo desde server
   const [activeTab, setActiveTab] = useState("patient"); // "patient" | "tnm"
+  // ---- TNM Nodo Regional (Observation) ----
+  const [currentPatient, setCurrentPatient] = useState(null); // Patient confirmado por server
+  const [tnmBasedOnRef, setTnmBasedOnRef] = useState("");  // ej: "ServiceRequest/123"
+  const [tnmStatus, setTnmStatus] = useState("final");     // required 1..1
+  const [tnmSubjectRef, setTnmSubjectRef] = useState("");  // ej: "Patient/abc" (ideal auto)
+  const [jsonTnmNodo, setJsonTnmNodo] = useState(null);
 
   
+
  
   // 🔹 Después constantes derivadas
   const canCreate = !!jsonPatient && !isCreating;
@@ -21,6 +29,12 @@ function App() {
  const [createResult, setCreateResult] = useState(null);
  const [createResponseRaw, setCreateResponseRaw] = useState("");
 // isCreating ya lo tienes
+
+useEffect(() => {
+  if (currentPatient?.resourceType === "Patient" && currentPatient?.id) {
+    setTnmSubjectRef(`Patient/${currentPatient.id}`);
+  }
+}, [currentPatient]);
 
 const handleCreateFicha = async () => {
   // ✅ Si aún no existe jsonPatient, lo generamos automáticamente (TU IDEA)
@@ -154,14 +168,14 @@ const handleCreateFicha = async () => {
     if (firstPatient) {
   // ✅ Existe -> modo EDIT
       setMode("edit");
-      setServerPatient(firstPatient);
+      setCurrentPatient(firstPatient);
       loadFormFromPatient(firstPatient);
       setScreen("create");
 
     } else {
   // ✅ No existe -> modo CREATE desde 0
       setMode("create");
-      setServerPatient(null);
+      setCurrentPatient(null);
       handleLimpiar();
       setScreen("create");
 
@@ -323,6 +337,32 @@ const handleCreateFicha = async () => {
     console.log("HEADERS:", Object.fromEntries(res.headers.entries()));
 
     const text = await res.text();   // 👈 AQUÍ
+
+    console.log("POST STATUS:", res.status);
+    console.log("POST LOCATION:", res.headers.get("location"));
+
+    if (res.status >= 200 && res.status < 300) {
+
+      const location = res.headers.get("location");
+      const idFromLocation =
+      location ? location.split("/Patient/")[1]?.split("/")[0] : null;
+
+      let created = null;
+      try { created = JSON.parse(text); } catch {}
+
+      if (created?.resourceType === "Patient" && created?.id) {
+      setCurrentPatient(created);
+      } else if (idFromLocation) {
+      const r2 = await fetch(`${API_BASE}/fhir/Patient/${idFromLocation}`, {
+      headers: { Accept: "application/fhir+json" }
+      });
+      const p2 = await r2.json();
+       setCurrentPatient(p2);
+  }
+
+  } 
+
+
     console.log("RAW RESPONSE:", text);
 
     let data;
@@ -342,6 +382,47 @@ const handleCreateFicha = async () => {
   } finally {
     setIsValidating(false);
   }
+};
+
+const handleBuildTnmNodo = () => {
+  // Validaciones mínimas (1..1)
+  if (!tnmBasedOnRef.trim()) {
+    alert("basedOn es requerido (ServiceRequest/...).");
+    return;
+  }
+  if (!tnmStatus) {
+    alert("status es requerido.");
+    return;
+  }
+  if (!tnmSubjectRef) {
+    alert("subject es requerido (se fija por paciente activo).");
+    return;
+  }
+
+  const obs = {
+    resourceType: "Observation",
+    meta: {
+      profile: [
+        "https://interoperabilidad.minsal.cl/fhir/ig/r2bo/StructureDefinition/r2bo-tnm-categoria-nodo-regional"
+      ]
+    },
+    basedOn: [
+      { reference: tnmBasedOnRef.trim() }
+    ],
+    status: tnmStatus,
+    subject: { reference: tnmSubjectRef },
+    code: {
+      coding: [
+        {
+          system: "http://snomed.info/sct",
+          code: "371494008",
+          display: "Stage of tumour involvement of regional lymph nodes"
+        }
+      ]
+    }
+  };
+
+  setJsonTnmNodo(obs);
 };
 
 
@@ -557,55 +638,101 @@ return (
       boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
     }}
   >
-    <h3 style={{ marginTop: 0 }}>Categoría TNM</h3>
-    <p style={{ marginTop: 6, opacity: 0.8 }}>
-      Aquí vamos a registrar la categoría TNM del paciente (T, N, M, estadio, fecha, método, etc.).
-    </p>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+      <div>
+        <h3 style={{ margin: 0 }}>Categoría TNM – Nodo Regional</h3>
+        <div style={{ fontSize: 12, opacity: 0.75 }}>
+          Perfil: r2bo-tnm-categoria-nodo-regional (campos: basedOn, status, subject, code)
+        </div>
+      </div>
 
-    {/* Placeholder inicial */}
-    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 10, alignItems: "center" }}>
-      <label>T</label>
-      <select defaultValue="">
-        <option value="">Seleccione...</option>
-        <option value="T0">T0</option>
-        <option value="Tis">Tis</option>
-        <option value="T1">T1</option>
-        <option value="T2">T2</option>
-        <option value="T3">T3</option>
-        <option value="T4">T4</option>
-      </select>
-
-      <label>N</label>
-      <select defaultValue="">
-        <option value="">Seleccione...</option>
-        <option value="N0">N0</option>
-        <option value="N1">N1</option>
-        <option value="N2">N2</option>
-        <option value="N3">N3</option>
-      </select>
-
-      <label>M</label>
-      <select defaultValue="">
-        <option value="">Seleccione...</option>
-        <option value="M0">M0</option>
-        <option value="M1">M1</option>
-      </select>
-
-      <label>Fecha</label>
-      <input type="date" />
-    </div>
-
-    <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between" }}>
       <button type="button" onClick={() => setActiveTab("patient")}>
         ← Volver a Paciente
       </button>
+    </div>
 
-      <button type="button" disabled style={{ opacity: 0.6 }}>
-        Guardar TNM (próximo paso)
+    <fieldset className="card" style={{ marginTop: 14 }}>
+      <legend><b>Campos requeridos</b></legend>
+
+      <div className="rows" style={{ marginTop: 10 }}>
+        <label>basedOn (ServiceRequest)</label>
+        <input
+          value={tnmBasedOnRef}
+          onChange={(e) => setTnmBasedOnRef(e.target.value)}
+          placeholder='Ej: ServiceRequest/123'
+          required
+        />
+
+        <label>status</label>
+        <select value={tnmStatus} onChange={(e) => setTnmStatus(e.target.value)} required>
+          <option value="registered">registered</option>
+          <option value="preliminary">preliminary</option>
+          <option value="final">final</option>
+          <option value="amended">amended</option>
+          <option value="corrected">corrected</option>
+          <option value="cancelled">cancelled</option>
+          <option value="entered-in-error">entered-in-error</option>
+          <option value="unknown">unknown</option>
+        </select>
+
+        <label>subject (Patient)</label>
+        <input value={tnmSubjectRef} disabled style={{ background: "#f8fafc" }} />
+
+        <label>code</label>
+        <div style={{ padding: "10px 10px", border: "1px solid #dcdcdc", borderRadius: 10, background: "#f8fafc" }}>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>system: <b>http://snomed.info/sct</b></div>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>code: <b>371494008</b></div>
+          <div style={{ marginTop: 4 }}>Stage of tumour involvement of regional lymph nodes</div>
+        </div>
+      </div>
+    </fieldset>
+
+    <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", gap: 10 }}>
+  <button type="button" onClick={() => setActiveTab("patient")}>
+    ← Volver a Paciente
+  </button>
+
+  <button type="button" onClick={handleBuildTnmNodo}>
+    Crear Recurso TNM Nodo
+  </button>
+</div>
+
+{jsonTnmNodo && (
+  <div style={{ marginTop: 16 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <strong>JSON TNM (Nodo Regional)</strong>
+      <button
+        type="button"
+        onClick={() => navigator.clipboard?.writeText(JSON.stringify(jsonTnmNodo, null, 2))}
+      >
+        Copiar
       </button>
     </div>
+
+    <pre style={{ marginTop: 10, background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
+      {JSON.stringify(jsonTnmNodo, null, 2)}
+    </pre>
   </div>
 )}
+
+
+    <style>{`
+      .card { border: 1px solid #e5e5e5; border-radius: 14px; padding: 14px; background: #fafafa; }
+      .card legend { padding: 0 8px; }
+      .rows { display: grid; grid-template-columns: minmax(170px, 42%) 1fr; gap: 12px; align-items: center; width: 100%; }
+      .rows label { font-size: 13px; color: #222; }
+      .rows input, .rows select {
+        width: 100% !important; min-width: 0;
+        padding: 10px 10px; border-radius: 10px; border: 1px solid #dcdcdc; box-sizing: border-box;
+      }
+      .rows input:focus, .rows select:focus {
+        border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148,163,184,0.25); outline: none;
+      }
+      @media (max-width: 900px) { .rows { grid-template-columns: 140px 1fr; } }
+    `}</style>
+  </div>
+)}
+
 
   {activeTab === "patient" && (
     <form
