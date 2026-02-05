@@ -1,0 +1,109 @@
+  export default function TnmNodoForm(props) {
+  
+  {activeTab === "tnm" && (
+  <div
+    style={{
+      maxWidth: 900,
+      margin: "0 auto",
+      background: "#fff",
+      color: "#111",
+      padding: 18,
+      borderRadius: 12,
+      boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
+    }}
+  >
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+      <div>
+        <h3 style={{ margin: 0 }}>Categoría TNM – Nodo Regional</h3>
+        <div style={{ fontSize: 12, opacity: 0.75 }}>
+          Perfil: r2bo-tnm-categoria-nodo-regional (campos: basedOn, status, subject, code)
+        </div>
+      </div>
+
+      <button type="button" onClick={() => setActiveTab("patient")}>
+        ← Volver a Paciente
+      </button>
+    </div>
+
+    <fieldset className="card" style={{ marginTop: 14 }}>
+      <legend><b>Campos requeridos</b></legend>
+
+      <div className="rows" style={{ marginTop: 10 }}>
+        <label>basedOn (ServiceRequest)</label>
+        <input
+          value={tnmBasedOnRef}
+          onChange={(e) => setTnmBasedOnRef(e.target.value)}
+          placeholder='Ej: ServiceRequest/123'
+          required
+        />
+
+        <label>status</label>
+        <select value={tnmStatus} onChange={(e) => setTnmStatus(e.target.value)} required>
+          <option value="registered">registered</option>
+          <option value="preliminary">preliminary</option>
+          <option value="final">final</option>
+          <option value="amended">amended</option>
+          <option value="corrected">corrected</option>
+          <option value="cancelled">cancelled</option>
+          <option value="entered-in-error">entered-in-error</option>
+          <option value="unknown">unknown</option>
+        </select>
+
+        <label>subject (Patient)</label>
+        <input value={tnmSubjectRef} disabled style={{ background: "#f8fafc" }} />
+
+        <label>code</label>
+        <div style={{ padding: "10px 10px", border: "1px solid #dcdcdc", borderRadius: 10, background: "#f8fafc" }}>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>system: <b>http://snomed.info/sct</b></div>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>code: <b>371494008</b></div>
+          <div style={{ marginTop: 4 }}>Stage of tumour involvement of regional lymph nodes</div>
+        </div>
+      </div>
+    </fieldset>
+
+    <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", gap: 10 }}>
+  <button type="button" onClick={() => setActiveTab("patient")}>
+    ← Volver a Paciente
+  </button>
+
+  <button type="button" onClick={handleBuildTnmNodo}>
+    Crear Recurso TNM Nodo
+  </button>
+</div>
+
+{jsonTnmNodo && (
+  <div style={{ marginTop: 16 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <strong>JSON TNM (Nodo Regional)</strong>
+      <button
+        type="button"
+        onClick={() => navigator.clipboard?.writeText(JSON.stringify(jsonTnmNodo, null, 2))}
+      >
+        Copiar
+      </button>
+    </div>
+
+    <pre style={{ marginTop: 10, background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
+      {JSON.stringify(jsonTnmNodo, null, 2)}
+    </pre>
+  </div>
+)}
+
+
+    <style>{`
+      .card { border: 1px solid #e5e5e5; border-radius: 14px; padding: 14px; background: #fafafa; }
+      .card legend { padding: 0 8px; }
+      .rows { display: grid; grid-template-columns: minmax(170px, 42%) 1fr; gap: 12px; align-items: center; width: 100%; }
+      .rows label { font-size: 13px; color: #222; }
+      .rows input, .rows select {
+        width: 100% !important; min-width: 0;
+        padding: 10px 10px; border-radius: 10px; border: 1px solid #dcdcdc; box-sizing: border-box;
+      }
+      .rows input:focus, .rows select:focus {
+        border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148,163,184,0.25); outline: none;
+      }
+      @media (max-width: 900px) { .rows { grid-template-columns: 140px 1fr; } }
+    `}</style>
+  </div>
+)}
+  }

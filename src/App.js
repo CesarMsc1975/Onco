@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 
 import { buildPatientResource } from "./fhir/buildPatient";
+import PatientForm from "./components/PatientForm";
+import TnmNodoForm from "./components/TnmNodoForm";
+import SolicitudForm from "./components/SolicitudForm";
+import { buildSolicitudInformeApa } from "./fhir/buildSolicitudInformeApa";
+
+console.log("PatientForm:", PatientForm);
+console.log("TnmNodoForm:", TnmNodoForm);
+
 
 function App() {
   // llamad a proxy local
@@ -19,12 +27,21 @@ function App() {
   const [tnmSubjectRef, setTnmSubjectRef] = useState("");  // ej: "Patient/abc" (ideal auto)
   const [jsonTnmNodo, setJsonTnmNodo] = useState(null);
 
-  
+  // ---- Solicitid de Informe (ServiceRequest) ----
+  const [SolicitudStatus, setSolicitudStatus] = useState("");
+  const [SolicitudIntent, setSolicitudIntent] = useState("");
+  const [SolicitudRequester, setSolicitudRequester] = useState("");
+  const [SolicitudPerformer, setSolicitudPerformer] = useState("");
+  const [SolicitudReasonCode, setSolicitudReasonCode] = useState("");
+  const [SolicitudSpecimen, setSolicitudSpecimen] = useState("");
+
+
+  const [jsonSolicitud, setJsonSolicitud] = useState(null);
 
  
   // 🔹 Después constantes derivadas
   const canCreate = !!jsonPatient && !isCreating;
-
+  const SolicitudSubjectRef = currentPatient?.id ? `Patient/${currentPatient.id}` : "";
   // 🔹 Después funciones
  const [createResult, setCreateResult] = useState(null);
  const [createResponseRaw, setCreateResponseRaw] = useState("");
@@ -425,6 +442,27 @@ const handleBuildTnmNodo = () => {
   setJsonTnmNodo(obs);
 };
 
+const handleBuildSolicitud = () => {
+  if (!SolicitudSubjectRef) return alert("No hay paciente activo (subject). Carga/crea paciente primero.");
+  if (!SolicitudStatus) return alert("status es requerido.");
+  if (!SolicitudIntent) return alert("intent es requerido.");
+  if (!SolicitudRequester.trim()) return alert("requester es requerido (ej: PractitionerRole/123).");
+  if (!SolicitudPerformer.trim()) return alert("performer es requerido (ej: Organization/456).");
+  if (!SolicitudReasonCode.trim()) return alert("reasonCode es requerido.");
+  if (!SolicitudSpecimen.trim()) return alert("specimen es requerido (1 o más, separados por coma).");
+
+  const sr = buildSolicitudInformeApa({
+    status: SolicitudStatus,
+    intent: SolicitudIntent,
+    subjectRef: SolicitudSubjectRef,
+    requesterRef: SolicitudRequester,
+    performerRef: SolicitudPerformer,
+    reasonCode: SolicitudReasonCode,
+    specimen: SolicitudSpecimen,
+  });
+
+  setJsonSolicitud(sr);
+};
 
   const handleLimpiar = () => {
     setId("");
@@ -531,7 +569,7 @@ const loadFormFromPatient = (p) => {
   setJsonPatient(p);
 };
 
-  
+console.log("activeTab =", JSON.stringify(activeTab));  
 return (
   <div className="App">
     <header className="App-header">
@@ -592,450 +630,147 @@ return (
       {/* =========================
           PANTALLA CREAR PACIENTE
       ========================== */}
-     {screen === "create" && (
-  <>
+   {screen === "create" && (
+  <div style={{ maxWidth: 900, width: "100%", background: "#fff", color: "#111", padding: 16, borderRadius: 12 }}>
     {/* Tabs */}
-  <div style={{ maxWidth: 900, margin: "0 auto 12px", display: "flex", gap: 8 }}>
-  <button
-    type="button"
-    onClick={() => setActiveTab("patient")}
-    style={{
-      padding: "8px 12px",
-      borderRadius: 12,
-      border: "1px solid #ddd",
-      cursor: "pointer",
-      background: activeTab === "patient" ? "#111827" : "#fff",
-      color: activeTab === "patient" ? "#fff" : "#111"
-    }}
-  >
-    Paciente
-  </button>
-
-  <button
-    type="button"
-    onClick={() => setActiveTab("tnm")}
-    style={{
-      padding: "8px 12px",
-      borderRadius: 12,
-      border: "1px solid #ddd",
-      cursor: "pointer",
-      background: activeTab === "tnm" ? "#111827" : "#fff",
-      color: activeTab === "tnm" ? "#fff" : "#111"
-    }}
-  >
-    Categoría TNM
-  </button>
-    </div>
-  {activeTab === "tnm" && (
-  <div
-    style={{
-      maxWidth: 900,
-      margin: "0 auto",
-      background: "#fff",
-      color: "#111",
-      padding: 18,
-      borderRadius: 12,
-      boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
-    }}
-  >
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-      <div>
-        <h3 style={{ margin: 0 }}>Categoría TNM – Nodo Regional</h3>
-        <div style={{ fontSize: 12, opacity: 0.75 }}>
-          Perfil: r2bo-tnm-categoria-nodo-regional (campos: basedOn, status, subject, code)
-        </div>
-      </div>
-
-      <button type="button" onClick={() => setActiveTab("patient")}>
-        ← Volver a Paciente
-      </button>
-    </div>
-
-    <fieldset className="card" style={{ marginTop: 14 }}>
-      <legend><b>Campos requeridos</b></legend>
-
-      <div className="rows" style={{ marginTop: 10 }}>
-        <label>basedOn (ServiceRequest)</label>
-        <input
-          value={tnmBasedOnRef}
-          onChange={(e) => setTnmBasedOnRef(e.target.value)}
-          placeholder='Ej: ServiceRequest/123'
-          required
-        />
-
-        <label>status</label>
-        <select value={tnmStatus} onChange={(e) => setTnmStatus(e.target.value)} required>
-          <option value="registered">registered</option>
-          <option value="preliminary">preliminary</option>
-          <option value="final">final</option>
-          <option value="amended">amended</option>
-          <option value="corrected">corrected</option>
-          <option value="cancelled">cancelled</option>
-          <option value="entered-in-error">entered-in-error</option>
-          <option value="unknown">unknown</option>
-        </select>
-
-        <label>subject (Patient)</label>
-        <input value={tnmSubjectRef} disabled style={{ background: "#f8fafc" }} />
-
-        <label>code</label>
-        <div style={{ padding: "10px 10px", border: "1px solid #dcdcdc", borderRadius: 10, background: "#f8fafc" }}>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>system: <b>http://snomed.info/sct</b></div>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>code: <b>371494008</b></div>
-          <div style={{ marginTop: 4 }}>Stage of tumour involvement of regional lymph nodes</div>
-        </div>
-      </div>
-    </fieldset>
-
-    <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", gap: 10 }}>
-  <button type="button" onClick={() => setActiveTab("patient")}>
-    ← Volver a Paciente
-  </button>
-
-  <button type="button" onClick={handleBuildTnmNodo}>
-    Crear Recurso TNM Nodo
-  </button>
-</div>
-
-{jsonTnmNodo && (
-  <div style={{ marginTop: 16 }}>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <strong>JSON TNM (Nodo Regional)</strong>
+    <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
       <button
         type="button"
-        onClick={() => navigator.clipboard?.writeText(JSON.stringify(jsonTnmNodo, null, 2))}
-      >
-        Copiar
-      </button>
-    </div>
-
-    <pre style={{ marginTop: 10, background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
-      {JSON.stringify(jsonTnmNodo, null, 2)}
-    </pre>
-  </div>
-)}
-
-
-    <style>{`
-      .card { border: 1px solid #e5e5e5; border-radius: 14px; padding: 14px; background: #fafafa; }
-      .card legend { padding: 0 8px; }
-      .rows { display: grid; grid-template-columns: minmax(170px, 42%) 1fr; gap: 12px; align-items: center; width: 100%; }
-      .rows label { font-size: 13px; color: #222; }
-      .rows input, .rows select {
-        width: 100% !important; min-width: 0;
-        padding: 10px 10px; border-radius: 10px; border: 1px solid #dcdcdc; box-sizing: border-box;
-      }
-      .rows input:focus, .rows select:focus {
-        border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(148,163,184,0.25); outline: none;
-      }
-      @media (max-width: 900px) { .rows { grid-template-columns: 140px 1fr; } }
-    `}</style>
-  </div>
-)}
-
-
-  {activeTab === "patient" && (
-    <form
-      onSubmit={(e) => { e.preventDefault(); handleGenerarPatient(); }}
-      style={{
-        textAlign: "left",
-        maxWidth: 900,
-        margin: "0 auto",
-        background: "#fff",
-        color: "#111",
-        padding: 18,
-        borderRadius: 12,
-        boxShadow: "0 10px 30px rgba(0,0,0,0.15)"
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-        <div>
-          <h3 style={{ margin: 0 }}>
-             {mode === "edit" ? "Paciente encontrado (editar)" : "Nuevo paciente"}
-          </h3>
-          <div style={{ fontSize: 12, opacity: 0.75 }}>
-            Campos requeridos + extensiones
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button type="submit" style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ddd", cursor: "pointer" }}>
-            Generar JSON
-          </button>
-
-          <button
-            type="button"
-            onClick={handleValidatePatient}
-            disabled={!canValidate || isValidating}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ddd", cursor: "pointer", opacity: (!canValidate || isValidating) ? 0.6 : 1 }}
-          >
-            {isValidating ? "Validando..." : "Validar en servidor ($validate)"}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLimpiar}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ddd", cursor: "pointer" }}
-          >
-            Limpiar
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setScreen("search")}
-            style={{ padding: "8px 12px", borderRadius: 10, border: "1px solid #ddd", cursor: "pointer" }}
-          >
-            Volver a búsqueda
-          </button>
-        </div>
-      </div>
-
-      {/* GRID PRINCIPAL (2 columnas) */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 16 }}>
-
-        {/* Identificación */}
-        <fieldset style={{ border: "1px solid #e5e5e5", borderRadius: 12, padding: 12 }}>
-          <legend style={{ padding: "0 8px" }}><strong>Identificación</strong></legend>
-
-          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 10, alignItems: "center" }}>
-            {/* NO lo borramos, lo dejamos comentado */}
-            {/*
-            <label>ID (FHIR):</label>
-            <input value={id} onChange={e => setId(e.target.value)} placeholder="No necesario (server asigna)" />
-            */}
-
-            <label>Tipo identificador:</label>
-            <select value={identifierTypeCode} onChange={e => setIdentifierTypeCode(e.target.value)} required>
-              <option value="">Seleccione...</option>
-              {tipoIdentificadorOptions.map(opt => (
-                <option key={opt.code} value={opt.code}>{opt.display}</option>
-              ))}
-            </select>
-
-            <label>Identificador (value):</label>
-            <input value={identifierValue} onChange={e => setIdentifierValue(e.target.value)} required placeholder="Ej: 12.345.678-9" />
-
-            <label>País emisión ID:</label>
-            <select value={identifierPaisEmision} onChange={e => setIdentifierPaisEmision(e.target.value)} required>
-              <option value="">Seleccione...</option>
-              {paisesOptions.map(opt => (
-                <option key={opt.code} value={opt.code}>{opt.display}</option>
-              ))}
-            </select>
-          </div>
-        </fieldset>
-
-        {/* Nombre */}
-        <fieldset style={{ border: "1px solid #e5e5e5", borderRadius: 12, padding: 12 }}>
-          <legend style={{ padding: "0 8px" }}><strong>Nombre</strong></legend>
-
-          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 10, alignItems: "center" }}>
-            <label>Primer apellido:</label>
-            <input value={nombreOficialFamily} onChange={e => setNombreOficialFamily(e.target.value)} required />
-
-            <label>Segundo apellido:</label>
-            <input value={nombreOficialSegundoApellido} onChange={e => setNombreOficialSegundoApellido(e.target.value)} />
-
-            <label>Nombres:</label>
-            <input value={nombreOficialGiven} onChange={e => setNombreOficialGiven(e.target.value)} required />
-          </div>
-        </fieldset>
-
-        {/* Demografía */}
-        <fieldset style={{ border: "1px solid #e5e5e5", borderRadius: 12, padding: 12 }}>
-          <legend style={{ padding: "0 8px" }}><strong>Demografía y origen</strong></legend>
-
-          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 10, alignItems: "center" }}>
-            <label>Sexo (gender):</label>
-            <select value={gender} onChange={e => setGender(e.target.value)} required>
-              <option value="">Seleccione...</option>
-              <option value="male">Masculino</option>
-              <option value="female">Femenino</option>
-              <option value="other">Otro</option>
-              <option value="unknown">Desconocido</option>
-            </select>
-
-            <label>Identidad de género:</label>
-            <select value={identidadGenero} onChange={e => setIdentidadGenero(e.target.value)} required>
-              <option value="">Seleccione...</option>
-              {identidadGeneroOptions.map(opt => (
-                <option key={opt.code} value={opt.code}>{opt.display}</option>
-              ))}
-            </select>
-
-            <label>Fecha nacimiento:</label>
-            <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} required />
-
-            <label>¿Fallecido?:</label>
-            <input type="checkbox" checked={deceasedBoolean} onChange={e => setDeceasedBoolean(e.target.checked)} />
-
-            <label>Nacionalidad:</label>
-            <select value={nacionalidad} onChange={e => setNacionalidad(e.target.value)} required>
-              <option value="">Seleccione...</option>
-              {paisesOptions.map(opt => (
-                <option key={opt.code} value={opt.code}>{opt.display}</option>
-              ))}
-            </select>
-
-            <label>País de origen:</label>
-            <select value={paisOrigen} onChange={e => setPaisOrigen(e.target.value)} required>
-              <option value="">Seleccione...</option>
-              {paisesOptions.map(opt => (
-                <option key={opt.code} value={opt.code}>{opt.display}</option>
-              ))}
-            </select>
-
-            <label>Pueblos originarios:</label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={pueblosOriginariosPerteneciente}
-                onChange={e => setPueblosOriginariosPerteneciente(e.target.checked)}
-              />
-              Pertenece
-            </label>
-          </div>
-        </fieldset>
-
-        {/* Contacto */}
-        <fieldset style={{ border: "1px solid #e5e5e5", borderRadius: 12, padding: 12 }}>
-          <legend style={{ padding: "0 8px" }}><strong>Contacto</strong></legend>
-
-          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 10, alignItems: "center" }}>
-            <label>Canal:</label>
-            <select value={telecomSystem} onChange={e => setTelecomSystem(e.target.value)}>
-              <option value="phone">Teléfono</option>
-              <option value="email">Email</option>
-            </select>
-
-            <label>Valor:</label>
-            <input
-              value={telecomValue}
-              onChange={e => setTelecomValue(e.target.value)}
-              required
-              placeholder={telecomSystem === "email" ? "nombre@dominio.cl" : "+56 9 1234 5678"}
-            />
-          </div>
-        </fieldset>
-      </div>
-
-      {/* JSON preview */}
-      {jsonPatient && (
-  <div style={{ marginTop: 16 }}>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <strong>JSON generado</strong>
-      <button
-        type="button"
-        onClick={() => navigator.clipboard?.writeText(JSON.stringify(jsonPatient, null, 2))}
-      >
-        Copiar
-      </button>
-    </div>
-
-    <pre style={{ marginTop: 10, background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
-      {JSON.stringify(jsonPatient, null, 2)}
-    </pre>
-
-    {/* 👇 BOTÓN CREAR FICHA VA AQUÍ */}
-    <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-      {mode === "create" && (
-        <button type="button" onClick={handleCreateFicha} disabled={isCreating || !jsonPatient}>
-          {isCreating ? "Creando..." : "Crear ficha"}
-        </button>
-      )}
-
-      
-      {createResult && (
-  <div style={{ marginTop: 12, padding: 10, borderRadius: 10, background: "#f3f4f6", color: "#111" }}>
-    <strong style={{ color: createResult.ok ? "green" : "crimson" }}>
-      {createResult.summary}
-    </strong>
-
-    {createResult.location && (
-      <div style={{ marginTop: 6, fontSize: 12 }}>
-        <div><b>Location:</b> {createResult.location}</div>
-        {createResult.id && <div><b>ID:</b> {createResult.id}</div>}
-      </div>
-    )}
-
-    {/* Botón para volver solo cuando tú quieras */}
-    <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-      <button type="button" onClick={() => { handleLimpiar(); setScreen("search"); }}>
-        Volver a búsqueda
-      </button>
-    </div>
-  </div>
-)}
-
-{createResponseRaw && (
-  <pre style={{ marginTop: 10, background: "#111", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
-    {createResponseRaw}
-  </pre>
-)}
-
-  
-  
-
-
-    </div>
-  </div>
-    )}
-
-
-      {/* Resultado validación */}
-      {validateResult && (
-        <div style={{ marginTop: 15 }}>
-          <strong>{validateResult.summary}</strong>
-        </div>
-      )}
-
-      {validateOutcome && (
-        <pre style={{ marginTop: 10, background: "#111", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
-          {JSON.stringify(validateOutcome, null, 2)}
-        </pre>
-      )}
-
-      
-
-   
-      <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end", gap: 10 }}>
-      <button
-        type="button"
-        onClick={handleCreateFicha}
-        disabled={isCreating || !jsonPatient}
+        onClick={() => setActiveTab("patient")}
         style={{
-          padding: "10px 14px",
-          borderRadius: 10,
+          padding: "8px 12px",
+          borderRadius: 12,
           border: "1px solid #ddd",
           cursor: "pointer",
-          opacity: (isCreating || !jsonPatient) ? 0.6 : 1
+          background: activeTab === "patient" ? "#111827" : "#fff",
+          color: activeTab === "patient" ? "#fff" : "#111"
         }}
       >
-        {isCreating ? "Creando..." : "Crear ficha"}
+        Paciente
       </button>
+
+      <button
+        type="button"
+        onClick={() => setActiveTab("tnm")}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 12,
+          border: "1px solid #ddd",
+          cursor: "pointer",
+          background: activeTab === "tnm" ? "#111827" : "#fff",
+          color: activeTab === "tnm" ? "#fff" : "#111"
+        }}
+      >
+        Categoría TNM
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setActiveTab("Solicitud")}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 12,
+          border: "1px solid #ddd",
+          cursor: "pointer",
+          background: activeTab === "Solicitud" ? "#111827" : "#fff",
+          color: activeTab === "Solicitud" ? "#fff" : "#111"
+        }}
+      >
+        Solicitud de Informe
+      </button>
+
+
+
     </div>
 
+    {/* Contenido por tab */}
+    {activeTab === "patient" && (
+      <PatientForm
+        mode={mode}
+        currentPatient={currentPatient}
+        // values + setters (ejemplos)
+        identifierValue={identifierValue}
+        setIdentifierValue={setIdentifierValue}
+        identifierTypeCode={identifierTypeCode}
+        setIdentifierTypeCode={setIdentifierTypeCode}
+        identifierPaisEmision={identifierPaisEmision}
+        setIdentifierPaisEmision={setIdentifierPaisEmision}
+        nombreOficialFamily={nombreOficialFamily}
+        setNombreOficialFamily={setNombreOficialFamily}
+        nombreOficialSegundoApellido={nombreOficialSegundoApellido}
+        setNombreOficialSegundoApellido={setNombreOficialSegundoApellido}
+        nombreOficialGiven={nombreOficialGiven}
+        setNombreOficialGiven={setNombreOficialGiven}
+        gender={gender}
+        setGender={setGender}
+        birthDate={birthDate}
+        setBirthDate={setBirthDate}
+        deceasedBoolean={deceasedBoolean}
+        setDeceasedBoolean={setDeceasedBoolean}
+        nacionalidad={nacionalidad}
+        setNacionalidad={setNacionalidad}
+        paisOrigen={paisOrigen}
+        setPaisOrigen={setPaisOrigen}
+        pueblosOriginariosPerteneciente={pueblosOriginariosPerteneciente}
+        setPueblosOriginariosPerteneciente={setPueblosOriginariosPerteneciente}
+        identidadGenero={identidadGenero}
+        setIdentidadGenero={setIdentidadGenero}
+        telecomSystem={telecomSystem}
+        setTelecomSystem={setTelecomSystem}
+        telecomValue={telecomValue}
+        setTelecomValue={setTelecomValue}
+        // lookups
+        tipoIdentificadorOptions={tipoIdentificadorOptions}
+        paisesOptions={paisesOptions}
+        identidadGeneroOptions={identidadGeneroOptions}
+        // acciones
+        onGenerar={handleGenerarPatient}
+        onValidate={handleValidatePatient}
+        onCreate={handleCreateFicha}
+        isCreating={isCreating}
+        isValidating={isValidating}
+        jsonPatient={jsonPatient}
+        validateOutcome={validateOutcome}
+        createResult={createResult}
+        createResponseRaw={createResponseRaw}
+      />
+    )}
 
-      {/* “CSS” mínimo para inputs (NO BORRAR) */}
-      <style>{`
-        input, select {
-          width: 100%;
-          padding: 10px 10px;
-          border-radius: 10px;
-          border: 1px solid #dcdcdc;
-          outline: none;
-          box-sizing: border-box;
-          min-width: 0;
-        }
-        input:focus, select:focus {
-          border-color: #94a3b8;
-          box-shadow: 0 0 0 3px rgba(148,163,184,0.25);
-        }
-        fieldset { background: #fafafa; }
-      `}</style>
-    </form>
-  )}
-  </>
+    {activeTab === "tnm" && (
+      <TnmNodoForm
+        currentPatient={currentPatient}
+        tnmBasedOnRef={tnmBasedOnRef}
+        setTnmBasedOnRef={setTnmBasedOnRef}
+        tnmStatus={tnmStatus}
+        setTnmStatus={setTnmStatus}
+        tnmSubjectRef={tnmSubjectRef}
+        jsonTnmNodo={jsonTnmNodo}
+        onBuild={handleBuildTnmNodo}
+      />
+    )}
+
+    {activeTab === "Solicitud" && (
+      <SolicitudForm
+        SolicitudStatus={SolicitudStatus} setSolicitudStatus={setSolicitudStatus}
+        SolicitudIntent={SolicitudIntent} setSolicitudIntent={setSolicitudIntent}
+        
+        SolicitudRequester={SolicitudRequester} setSolicitudRequester={setSolicitudRequester}
+        SolicitudPerformer={SolicitudPerformer} setSolicitudPerformer={setSolicitudPerformer}
+        SolicitudReasonCode={SolicitudReasonCode} setSolicitudReasonCode={setSolicitudReasonCode}
+        SolicitudSpecimen={SolicitudSpecimen} setSolicitudSpecimen={setSolicitudSpecimen}
+        onLimpiar={() => {
+          setSolicitudStatus("");
+          setSolicitudIntent("");
+          
+          setSolicitudRequester("");
+          setSolicitudPerformer("");
+          setSolicitudReasonCode("");
+          setSolicitudSpecimen("");
+        }}
+  />
+)}
+
+  </div>
 )}
 
 
