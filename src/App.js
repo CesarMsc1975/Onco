@@ -38,6 +38,11 @@ function App() {
 
   const [jsonSolicitud, setJsonSolicitud] = useState(null);
 
+// PractitionerRole search
+  const [practitionerIdentifier, setPractitionerIdentifier] = useState("");
+  const [practitionerRoleRef, setPractitionerRoleRef] = useState(""); // "PractitionerRole/{id}"
+  const [practitionerRoleMsg, setPractitionerRoleMsg] = useState("");
+  const [isSearchingPractitionerRole, setIsSearchingPractitionerRole] = useState(false);
  
   // 🔹 Después constantes derivadas
   const canCreate = !!jsonPatient && !isCreating;
@@ -52,6 +57,10 @@ useEffect(() => {
     setTnmSubjectRef(`Patient/${currentPatient.id}`);
   }
 }, [currentPatient]);
+
+useEffect(() => {
+  setJsonSolicitud(null);
+}, [currentPatient?.id]);
 
 const handleCreateFicha = async () => {
   // ✅ Si aún no existe jsonPatient, lo generamos automáticamente (TU IDEA)
@@ -569,6 +578,51 @@ const loadFormFromPatient = (p) => {
   setJsonPatient(p);
 };
 
+const handleBuscarPractitionerRole = async () => {
+  const ident = (practitionerIdentifier || "").trim();
+  if (!ident) {
+    setPractitionerRoleMsg("Debes ingresar un Identificador Prestador.");
+    setPractitionerRoleRef("");
+    return;
+  }
+
+  setIsSearchingPractitionerRole(true);
+  setPractitionerRoleMsg("");
+  setPractitionerRoleRef("");
+
+  try {
+    const url = `/fhir/PractitionerRole?practitioner.identifier=${encodeURIComponent(ident)}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/fhir+json" }
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      setPractitionerRoleMsg(`Error HTTP ${res.status}: ${txt}`);
+      return;
+    }
+
+    const bundle = await res.json();
+
+    const firstEntry = bundle?.entry?.[0];
+    const foundId = firstEntry?.resource?.id;
+
+    if (!foundId) {
+      setPractitionerRoleMsg("Búsqueda nula");
+      setPractitionerRoleRef("");
+      return;
+    }
+
+    setPractitionerRoleRef(`PractitionerRole/${foundId}`);
+    setPractitionerRoleMsg(`Encontrado: ${foundId}`);
+  } catch (e) {
+    setPractitionerRoleMsg(`Error: ${String(e?.message || e)}`);
+  } finally {
+    setIsSearchingPractitionerRole(false);
+  }
+};
+
 console.log("activeTab =", JSON.stringify(activeTab));  
 return (
   <div className="App">
@@ -609,6 +663,57 @@ return (
           </div>
         </div>
       )}
+
+      {/* Ingreso Rol (PractitionerRole) */}
+      <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid #e5e7eb" }}>
+        <h3 style={{ margin: "0 0 8px 0" }}>Ingreso Rol</h3>
+      
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            type="text"
+            placeholder="Identificador Prestador"
+            value={practitionerIdentifier}
+            onChange={(e) => setPractitionerIdentifier(e.target.value)}
+            style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", minWidth: 260 }}
+          />
+      
+          <button
+            type="button"
+            onClick={handleBuscarPractitionerRole}
+            disabled={isSearchingPractitionerRole}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              cursor: isSearchingPractitionerRole ? "not-allowed" : "pointer",
+              background: "#111827",
+              color: "#fff"
+            }}
+          >
+            {isSearchingPractitionerRole ? "Buscando..." : "Buscar"}
+          </button>
+        </div>
+      
+        {/* Resultado / cartel */}
+        {practitionerRoleMsg && (
+          <div
+            style={{
+              marginTop: 10,
+              padding: "10px 12px",
+              borderRadius: 12,
+              background: practitionerRoleRef ? "#ecfdf5" : "#fef2f2",
+              border: "1px solid #e5e7eb"
+            }}
+          >
+            <div style={{ fontWeight: 600 }}>{practitionerRoleMsg}</div>
+            {practitionerRoleRef && (
+              <div style={{ marginTop: 6, fontFamily: "monospace" }}>
+                Ref guardada: {practitionerRoleRef}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* =========================
           PANTALLA VER JSON
@@ -749,24 +854,28 @@ return (
       />
     )}
 
-    {activeTab === "Solicitud" && (
-      <SolicitudForm
-        SolicitudStatus={SolicitudStatus} setSolicitudStatus={setSolicitudStatus}
-        SolicitudIntent={SolicitudIntent} setSolicitudIntent={setSolicitudIntent}
-        
-        SolicitudRequester={SolicitudRequester} setSolicitudRequester={setSolicitudRequester}
-        SolicitudPerformer={SolicitudPerformer} setSolicitudPerformer={setSolicitudPerformer}
-        SolicitudReasonCode={SolicitudReasonCode} setSolicitudReasonCode={setSolicitudReasonCode}
-        SolicitudSpecimen={SolicitudSpecimen} setSolicitudSpecimen={setSolicitudSpecimen}
-        onLimpiar={() => {
-          setSolicitudStatus("");
-          setSolicitudIntent("");
-          
-          setSolicitudRequester("");
-          setSolicitudPerformer("");
-          setSolicitudReasonCode("");
-          setSolicitudSpecimen("");
-        }}
+{activeTab === "Solicitud" && (
+  <SolicitudForm
+    SolicitudStatus={SolicitudStatus} setSolicitudStatus={setSolicitudStatus}
+    SolicitudIntent={SolicitudIntent} setSolicitudIntent={setSolicitudIntent}
+    SolicitudRequester={SolicitudRequester} setSolicitudRequester={setSolicitudRequester}
+    SolicitudPerformer={SolicitudPerformer} setSolicitudPerformer={setSolicitudPerformer}
+    SolicitudReasonCode={SolicitudReasonCode} setSolicitudReasonCode={setSolicitudReasonCode}
+    SolicitudSpecimen={SolicitudSpecimen} setSolicitudSpecimen={setSolicitudSpecimen}
+
+    subjectRef={SolicitudSubjectRef}              // ✅ (1) subject automático
+    onBuild={handleBuildSolicitud}                // ✅ (2) genera JSON
+    jsonSolicitud={jsonSolicitud}                 // ✅ (3) se muestra en pantalla
+
+    onLimpiar={() => {
+      setSolicitudStatus("");
+      setSolicitudIntent("");
+      setSolicitudRequester("");
+      setSolicitudPerformer("");
+      setSolicitudReasonCode("");
+      setSolicitudSpecimen("");
+      setJsonSolicitud(null); // ✅ limpia el preview también
+    }}
   />
 )}
 

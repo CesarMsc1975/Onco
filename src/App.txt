@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 
 import { buildPatientResource } from "./fhir/buildPatient";
+import PatientForm from "./components/PatientForm";
+import TnmNodoForm from "./components/TnmNodoForm";
+import SolicitudForm from "./components/SolicitudForm";
+import { buildSolicitudInformeApa } from "./fhir/buildSolicitudInformeApa";
+
+console.log("PatientForm:", PatientForm);
+console.log("TnmNodoForm:", TnmNodoForm);
+
 
 function App() {
   // llamad a proxy local
@@ -19,12 +27,21 @@ function App() {
   const [tnmSubjectRef, setTnmSubjectRef] = useState("");  // ej: "Patient/abc" (ideal auto)
   const [jsonTnmNodo, setJsonTnmNodo] = useState(null);
 
-  
+  // ---- Solicitid de Informe (ServiceRequest) ----
+  const [SolicitudStatus, setSolicitudStatus] = useState("");
+  const [SolicitudIntent, setSolicitudIntent] = useState("");
+  const [SolicitudRequester, setSolicitudRequester] = useState("");
+  const [SolicitudPerformer, setSolicitudPerformer] = useState("");
+  const [SolicitudReasonCode, setSolicitudReasonCode] = useState("");
+  const [SolicitudSpecimen, setSolicitudSpecimen] = useState("");
+
+
+  const [jsonSolicitud, setJsonSolicitud] = useState(null);
 
  
   // 🔹 Después constantes derivadas
   const canCreate = !!jsonPatient && !isCreating;
-
+  const SolicitudSubjectRef = currentPatient?.id ? `Patient/${currentPatient.id}` : "";
   // 🔹 Después funciones
  const [createResult, setCreateResult] = useState(null);
  const [createResponseRaw, setCreateResponseRaw] = useState("");
@@ -425,6 +442,27 @@ const handleBuildTnmNodo = () => {
   setJsonTnmNodo(obs);
 };
 
+const handleBuildSolicitud = () => {
+  if (!SolicitudSubjectRef) return alert("No hay paciente activo (subject). Carga/crea paciente primero.");
+  if (!SolicitudStatus) return alert("status es requerido.");
+  if (!SolicitudIntent) return alert("intent es requerido.");
+  if (!SolicitudRequester.trim()) return alert("requester es requerido (ej: PractitionerRole/123).");
+  if (!SolicitudPerformer.trim()) return alert("performer es requerido (ej: Organization/456).");
+  if (!SolicitudReasonCode.trim()) return alert("reasonCode es requerido.");
+  if (!SolicitudSpecimen.trim()) return alert("specimen es requerido (1 o más, separados por coma).");
+
+  const sr = buildSolicitudInformeApa({
+    status: SolicitudStatus,
+    intent: SolicitudIntent,
+    subjectRef: SolicitudSubjectRef,
+    requesterRef: SolicitudRequester,
+    performerRef: SolicitudPerformer,
+    reasonCode: SolicitudReasonCode,
+    specimen: SolicitudSpecimen,
+  });
+
+  setJsonSolicitud(sr);
+};
 
   const handleLimpiar = () => {
     setId("");
@@ -531,7 +569,7 @@ const loadFormFromPatient = (p) => {
   setJsonPatient(p);
 };
 
-  
+console.log("activeTab =", JSON.stringify(activeTab));  
 return (
   <div className="App">
     <header className="App-header">
@@ -592,45 +630,147 @@ return (
       {/* =========================
           PANTALLA CREAR PACIENTE
       ========================== */}
-     {screen === "create" && (
-  <>
+   {screen === "create" && (
+  <div style={{ maxWidth: 900, width: "100%", background: "#fff", color: "#111", padding: 16, borderRadius: 12 }}>
     {/* Tabs */}
-  <div style={{ maxWidth: 900, margin: "0 auto 12px", display: "flex", gap: 8 }}>
-  <button
-    type="button"
-    onClick={() => setActiveTab("patient")}
-    style={{
-      padding: "8px 12px",
-      borderRadius: 12,
-      border: "1px solid #ddd",
-      cursor: "pointer",
-      background: activeTab === "patient" ? "#111827" : "#fff",
-      color: activeTab === "patient" ? "#fff" : "#111"
-    }}
-  >
-    Paciente
-  </button>
+    <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      <button
+        type="button"
+        onClick={() => setActiveTab("patient")}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 12,
+          border: "1px solid #ddd",
+          cursor: "pointer",
+          background: activeTab === "patient" ? "#111827" : "#fff",
+          color: activeTab === "patient" ? "#fff" : "#111"
+        }}
+      >
+        Paciente
+      </button>
 
-  <button
-    type="button"
-    onClick={() => setActiveTab("tnm")}
-    style={{
-      padding: "8px 12px",
-      borderRadius: 12,
-      border: "1px solid #ddd",
-      cursor: "pointer",
-      background: activeTab === "tnm" ? "#111827" : "#fff",
-      color: activeTab === "tnm" ? "#fff" : "#111"
-    }}
-  >
-    Categoría TNM
-  </button>
+      <button
+        type="button"
+        onClick={() => setActiveTab("tnm")}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 12,
+          border: "1px solid #ddd",
+          cursor: "pointer",
+          background: activeTab === "tnm" ? "#111827" : "#fff",
+          color: activeTab === "tnm" ? "#fff" : "#111"
+        }}
+      >
+        Categoría TNM
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setActiveTab("Solicitud")}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 12,
+          border: "1px solid #ddd",
+          cursor: "pointer",
+          background: activeTab === "Solicitud" ? "#111827" : "#fff",
+          color: activeTab === "Solicitud" ? "#fff" : "#111"
+        }}
+      >
+        Solicitud de Informe
+      </button>
+
+
+
     </div>
 
+    {/* Contenido por tab */}
+    {activeTab === "patient" && (
+      <PatientForm
+        mode={mode}
+        currentPatient={currentPatient}
+        // values + setters (ejemplos)
+        identifierValue={identifierValue}
+        setIdentifierValue={setIdentifierValue}
+        identifierTypeCode={identifierTypeCode}
+        setIdentifierTypeCode={setIdentifierTypeCode}
+        identifierPaisEmision={identifierPaisEmision}
+        setIdentifierPaisEmision={setIdentifierPaisEmision}
+        nombreOficialFamily={nombreOficialFamily}
+        setNombreOficialFamily={setNombreOficialFamily}
+        nombreOficialSegundoApellido={nombreOficialSegundoApellido}
+        setNombreOficialSegundoApellido={setNombreOficialSegundoApellido}
+        nombreOficialGiven={nombreOficialGiven}
+        setNombreOficialGiven={setNombreOficialGiven}
+        gender={gender}
+        setGender={setGender}
+        birthDate={birthDate}
+        setBirthDate={setBirthDate}
+        deceasedBoolean={deceasedBoolean}
+        setDeceasedBoolean={setDeceasedBoolean}
+        nacionalidad={nacionalidad}
+        setNacionalidad={setNacionalidad}
+        paisOrigen={paisOrigen}
+        setPaisOrigen={setPaisOrigen}
+        pueblosOriginariosPerteneciente={pueblosOriginariosPerteneciente}
+        setPueblosOriginariosPerteneciente={setPueblosOriginariosPerteneciente}
+        identidadGenero={identidadGenero}
+        setIdentidadGenero={setIdentidadGenero}
+        telecomSystem={telecomSystem}
+        setTelecomSystem={setTelecomSystem}
+        telecomValue={telecomValue}
+        setTelecomValue={setTelecomValue}
+        // lookups
+        tipoIdentificadorOptions={tipoIdentificadorOptions}
+        paisesOptions={paisesOptions}
+        identidadGeneroOptions={identidadGeneroOptions}
+        // acciones
+        onGenerar={handleGenerarPatient}
+        onValidate={handleValidatePatient}
+        onCreate={handleCreateFicha}
+        isCreating={isCreating}
+        isValidating={isValidating}
+        jsonPatient={jsonPatient}
+        validateOutcome={validateOutcome}
+        createResult={createResult}
+        createResponseRaw={createResponseRaw}
+      />
+    )}
 
+    {activeTab === "tnm" && (
+      <TnmNodoForm
+        currentPatient={currentPatient}
+        tnmBasedOnRef={tnmBasedOnRef}
+        setTnmBasedOnRef={setTnmBasedOnRef}
+        tnmStatus={tnmStatus}
+        setTnmStatus={setTnmStatus}
+        tnmSubjectRef={tnmSubjectRef}
+        jsonTnmNodo={jsonTnmNodo}
+        onBuild={handleBuildTnmNodo}
+      />
+    )}
 
-  
-  </>
+    {activeTab === "Solicitud" && (
+      <SolicitudForm
+        SolicitudStatus={SolicitudStatus} setSolicitudStatus={setSolicitudStatus}
+        SolicitudIntent={SolicitudIntent} setSolicitudIntent={setSolicitudIntent}
+        
+        SolicitudRequester={SolicitudRequester} setSolicitudRequester={setSolicitudRequester}
+        SolicitudPerformer={SolicitudPerformer} setSolicitudPerformer={setSolicitudPerformer}
+        SolicitudReasonCode={SolicitudReasonCode} setSolicitudReasonCode={setSolicitudReasonCode}
+        SolicitudSpecimen={SolicitudSpecimen} setSolicitudSpecimen={setSolicitudSpecimen}
+        onLimpiar={() => {
+          setSolicitudStatus("");
+          setSolicitudIntent("");
+          
+          setSolicitudRequester("");
+          setSolicitudPerformer("");
+          setSolicitudReasonCode("");
+          setSolicitudSpecimen("");
+        }}
+  />
+)}
+
+  </div>
 )}
 
 
