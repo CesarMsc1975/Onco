@@ -43,7 +43,14 @@ function App() {
   const [practitionerRoleRef, setPractitionerRoleRef] = useState(""); // "PractitionerRole/{id}"
   const [practitionerRoleMsg, setPractitionerRoleMsg] = useState("");
   const [isSearchingPractitionerRole, setIsSearchingPractitionerRole] = useState(false);
- 
+
+  
+// Organization search (Prestador Organizacional)
+  const [orgIdentifier, setOrgIdentifier] = useState("");
+  const [organizationRef, setOrganizationRef] = useState(""); // "Organization/{id}"
+  const [organizationMsg, setOrganizationMsg] = useState("");
+  const [isSearchingOrganization, setIsSearchingOrganization] = useState(false);
+
   // 🔹 Después constantes derivadas
   const canCreate = !!jsonPatient && !isCreating;
   const SolicitudSubjectRef = currentPatient?.id ? `Patient/${currentPatient.id}` : "";
@@ -623,6 +630,52 @@ const handleBuscarPractitionerRole = async () => {
   }
 };
 
+const handleBuscarOrganization = async () => {
+  const ident = (orgIdentifier || "").trim();
+
+  if (!ident) {
+    setOrganizationMsg("Debes ingresar un identificador.");
+    setOrganizationRef("");
+    return;
+  }
+
+  setIsSearchingOrganization(true);
+  setOrganizationMsg("");
+  setOrganizationRef("");
+
+  try {
+    // Usa ruta relativa para que pase por el proxy de CRA (igual que el Rol)
+    const url = `/fhir/Organization?identifier=${encodeURIComponent(ident)}`;
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/fhir+json" }
+    });
+
+    if (!res.ok) {
+      const txt = await res.text();
+      setOrganizationMsg(`Error HTTP ${res.status}: ${txt}`);
+      return;
+    }
+
+    const bundle = await res.json();
+    const foundId = bundle?.entry?.[0]?.resource?.id;
+
+    if (!foundId) {
+      setOrganizationMsg("Búsqueda nula");
+      setOrganizationRef("");
+      return;
+    }
+
+    setOrganizationRef(`Organization/${foundId}`);
+    setOrganizationMsg(`Encontrado: ${foundId}`);
+  } catch (e) {
+    setOrganizationMsg(`Error: ${String(e?.message || e)}`);
+  } finally {
+    setIsSearchingOrganization(false);
+  }
+};
+
 console.log("activeTab =", JSON.stringify(activeTab));  
 return (
   <div className="App">
@@ -714,6 +767,58 @@ return (
           </div>
         )}
       </div>
+
+{/* Prestador Organizacional (Organization) */}
+<div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid #e5e7eb" }}>
+  <h3 style={{ margin: "0 0 8px 0" }}>Prestador Organizacional</h3>
+
+  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <input
+      type="text"
+      placeholder="Identificador"
+      value={orgIdentifier}
+      onChange={(e) => setOrgIdentifier(e.target.value)}
+      style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", minWidth: 260 }}
+    />
+
+    <button
+      type="button"
+      onClick={handleBuscarOrganization}
+      disabled={isSearchingOrganization}
+      style={{
+        padding: "8px 12px",
+        borderRadius: 12,
+        border: "1px solid #ddd",
+        cursor: isSearchingOrganization ? "not-allowed" : "pointer",
+        background: "#111827",
+        color: "#fff"
+      }}
+    >
+      {isSearchingOrganization ? "Buscando..." : "Buscar"}
+    </button>
+  </div>
+
+  {/* Resultado / cartel */}
+  {organizationMsg && (
+    <div
+      style={{
+        marginTop: 10,
+        padding: "10px 12px",
+        borderRadius: 12,
+        background: organizationRef ? "#ecfdf5" : "#fef2f2",
+        border: "1px solid #e5e7eb"
+      }}
+    >
+      <div style={{ fontWeight: 600 }}>{organizationMsg}</div>
+
+      {organizationRef && (
+        <div style={{ marginTop: 6, fontFamily: "monospace" }}>
+          Ref guardada: {organizationRef}
+        </div>
+      )}
+    </div>
+  )}
+</div>
 
       {/* =========================
           PANTALLA VER JSON
