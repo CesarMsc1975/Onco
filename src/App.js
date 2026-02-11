@@ -5,6 +5,9 @@ import PatientForm from "./components/PatientForm";
 import TnmNodoForm from "./components/TnmNodoForm";
 import SolicitudForm from "./components/SolicitudForm";
 import { buildSolicitudInformeApa } from "./fhir/buildSolicitudInformeApa";
+import { buildMuestraBiopsia } from "./fhir/buildMuestraBiopsia";
+import { buildInformeBiopsia } from "./fhir/buildInformeBiopsia";
+import InformeAPForm from "./components/InformeAPForm";
 
 console.log("PatientForm:", PatientForm);
 console.log("TnmNodoForm:", TnmNodoForm);
@@ -51,6 +54,26 @@ function App() {
   const [organizationMsg, setOrganizationMsg] = useState("");
   const [isSearchingOrganization, setIsSearchingOrganization] = useState(false);
 
+// ===== Muestra (Specimen: r2bo-muestra-biopsia) =====
+  const [muestraReceivedTime, setMuestraReceivedTime] = useState("");          // receivedTime
+  const [muestraCollectedDateTime, setMuestraCollectedDateTime] = useState(""); // collection.collectedDateTime
+  const [jsonMuestra, setJsonMuestra] = useState(null);
+
+// method + extension (texto por ahora)
+  const [muestraMethod, setMuestraMethod] = useState("");                     // method (texto/código simple)
+  const [muestraMethodExt, setMuestraMethodExt] = useState("");               // extension de method (texto)
+
+// bodySite + extension (texto por ahora)
+  const [muestraBodySite, setMuestraBodySite] = useState("");                 // bodySite (texto/código simple)
+  const [muestraBodySiteExt, setMuestraBodySiteExt] = useState("");           // extension de bodySite (texto)
+
+ // Informe Anatomía Patológica (DiagnosticReport: r2bo-informe-biopsia)
+  const [informeIssued, setInformeIssued] = useState("");
+  const [informeConclusion, setInformeConclusion] = useState("");
+  const [jsonInformeAP, setJsonInformeAP] = useState(null);
+  
+
+
   // 🔹 Después constantes derivadas
   const canCreate = !!jsonPatient && !isCreating;
   const SolicitudSubjectRef = currentPatient?.id ? `Patient/${currentPatient.id}` : "";
@@ -68,6 +91,23 @@ useEffect(() => {
 useEffect(() => {
   setJsonSolicitud(null);
 }, [currentPatient?.id]);
+
+useEffect(() => {
+  setJsonMuestra(null);
+}, [currentPatient?.id]);
+
+
+useEffect(() => {
+  if (practitionerRoleRef) {
+    setSolicitudRequester(practitionerRoleRef);
+  }
+}, [practitionerRoleRef]);
+
+useEffect(() => {
+  if (organizationRef) {
+    setSolicitudPerformer(organizationRef);
+  }
+}, [organizationRef]);
 
 const handleCreateFicha = async () => {
   // ✅ Si aún no existe jsonPatient, lo generamos automáticamente (TU IDEA)
@@ -480,6 +520,41 @@ const handleBuildSolicitud = () => {
   setJsonSolicitud(sr);
 };
 
+const handleBuildMuestra = () => {
+  if (!SolicitudSubjectRef) return alert("No hay paciente activo (subject). Carga/crea paciente primero.");
+
+  if (!muestraReceivedTime) return alert("Muestra.receivedTime es requerido.");
+  if (!muestraCollectedDateTime) return alert("Muestra.collection.collectedDateTime es requerido.");
+  if (!muestraMethod.trim()) return alert("Muestra.collection.method es requerido.");
+  if (!muestraMethodExt.trim()) return alert("Muestra.collection.method.extension es requerido.");
+  if (!muestraBodySite.trim()) return alert("Muestra.collection.bodySite es requerido.");
+  if (!muestraBodySiteExt.trim()) return alert("Muestra.collection.bodySite.extension es requerido.");
+
+  const sp = buildMuestraBiopsia({
+    subjectRef: SolicitudSubjectRef,
+    receivedTime: muestraReceivedTime,
+    collectedDateTime: muestraCollectedDateTime,
+    method: muestraMethod,
+    methodExt: muestraMethodExt,
+    bodySite: muestraBodySite,
+    bodySiteExt: muestraBodySiteExt,
+  });
+
+  setJsonMuestra(sp);
+};
+
+const handleBuildInformeAP = () => {
+  const json = buildInformeBiopsia({
+    subjectRef: `Patient/${currentPatient.id}`,
+    basedOnRef: null,
+    specimenRef: null,
+    issued: informeIssued,
+    conclusion: informeConclusion
+  });
+
+  setJsonInformeAP(json);
+};
+
   const handleLimpiar = () => {
     setId("");
     setIdentifierValue("");
@@ -889,7 +964,23 @@ return (
         Solicitud de Informe
       </button>
 
-
+      <button
+        type="button"
+          onClick={() => {
+          console.log("CLICK informeAP");
+          setActiveTab("informeAP");
+          }}
+        style={{
+          padding: "8px 12px",
+          borderRadius: 12,
+          border: "1px solid #ddd",
+          cursor: "pointer",
+          background: activeTab === "InformeAP" ? "#111827" : "#fff",
+          color: activeTab === "InformeAP" ? "#fff" : "#111"
+        }}
+      >
+        Informe AP
+      </button>
 
     </div>
 
@@ -972,6 +1063,22 @@ return (
     onBuild={handleBuildSolicitud}                // ✅ (2) genera JSON
     jsonSolicitud={jsonSolicitud}                 // ✅ (3) se muestra en pantalla
 
+    onBuildMuestra={handleBuildMuestra}
+    jsonMuestra={jsonMuestra}
+
+    MuestraReceivedTime={muestraReceivedTime}
+    setMuestraReceivedTime={setMuestraReceivedTime}
+    MuestraCollectedDateTime={muestraCollectedDateTime}
+    setMuestraCollectedDateTime={setMuestraCollectedDateTime}
+    MuestraMethod={muestraMethod}
+    setMuestraMethod={setMuestraMethod}
+    MuestraMethodExt={muestraMethodExt}
+    setMuestraMethodExt={setMuestraMethodExt}
+    MuestraBodySite={muestraBodySite}
+    setMuestraBodySite={setMuestraBodySite}
+    MuestraBodySiteExt={muestraBodySiteExt}
+    setMuestraBodySiteExt={setMuestraBodySiteExt}
+    
     onLimpiar={() => {
       setSolicitudStatus("");
       setSolicitudIntent("");
@@ -980,7 +1087,30 @@ return (
       setSolicitudReasonCode("");
       setSolicitudSpecimen("");
       setJsonSolicitud(null); // ✅ limpia el preview también
+
+      setMuestraReceivedTime("");
+      setMuestraCollectedDateTime("");
+      setMuestraMethod("");
+      setMuestraMethodExt("");
+      setMuestraBodySite("");
+      setMuestraBodySiteExt("");
+         
     }}
+  />
+
+)}
+
+{activeTab === "informeAP" && (
+  <InformeAPForm
+    subjectRef={SolicitudSubjectRef}
+    basedOnRef={""}
+    specimenRef={""}
+    issued={informeIssued}
+    setIssued={setInformeIssued}
+    conclusion={informeConclusion}
+    setConclusion={setInformeConclusion}
+    onBuildInforme={handleBuildInformeAP}
+    jsonInforme={jsonInformeAP}
   />
 )}
 

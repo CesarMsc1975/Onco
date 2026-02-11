@@ -1,24 +1,49 @@
 export default function SolicitudForm({
-  // estados/sets (los define App.js)
   SolicitudStatus, setSolicitudStatus,
   SolicitudIntent, setSolicitudIntent,
 
-  // aunque lo tengas en estado, el perfil tiene code fijo → lo mostraremos fijo
   SolicitudRequester, setSolicitudRequester,
   SolicitudPerformer, setSolicitudPerformer,
   SolicitudReasonCode, setSolicitudReasonCode,
   SolicitudSpecimen, setSolicitudSpecimen,
 
-  // 👇 nuevo: subject calculado (Patient/{id})
-  subjectRef,
+  MuestraReceivedTime, setMuestraReceivedTime,
+  MuestraCollectedDateTime, setMuestraCollectedDateTime,
+  MuestraMethod, setMuestraMethod,
+  MuestraMethodExt, setMuestraMethodExt,
+  MuestraBodySite, setMuestraBodySite,
+  MuestraBodySiteExt, setMuestraBodySiteExt,
 
-  // acciones
+  subjectRef,
   onLimpiar,
   onBuild,
+  jsonSolicitud,
 
-  // salida
-  jsonSolicitud
+  onBuildMuestra,
+  jsonMuestra
 }) {
+
+  const REASON_OPTIONS = [
+    { code: "363346000", display: "Malignant neoplastic disease" },
+    { code: "109356001", display: "Primary malignant neoplasm of unspecified site" },
+    { code: "443679004", display: "Malignant neoplasm of skeletal system" },
+    { code: "399068003", display: "Malignant tumor of prostate" },
+    { code: "1287652008", display: "History of metastatic cancer" },
+  ];
+
+    // --- ValueSets pequeños (combobox) para extensiones de Muestra ---
+  const TIPO_PROCED_BIOPSIA_OPTIONS = [
+    { value: "http://snomed.info/sct|8889005|Excisional biopsy", label: "Excisional biopsy (8889005)" },
+    { value: "http://snomed.info/sct|70871006|Incisional biopsy", label: "Incisional biopsy (70871006)" },
+  ];
+
+  const LATERALITY_OPTIONS = [
+    { value: "http://snomed.info/sct|24028007|Right", label: "Right (24028007)" },
+    { value: "http://snomed.info/sct|7771000|Left", label: "Left (7771000)" },
+    { value: "http://snomed.info/sct|51440002|Right and left", label: "Right and left (51440002)" },
+    { value: "http://snomed.info/sct|399488007|Midline (qualifier value)", label: "Midline (399488007)" },
+  ];
+
   return (
     <div
       style={{
@@ -105,13 +130,20 @@ export default function SolicitudForm({
             required
           />
 
-          <label>reasonCode</label>
-          <input
-            value={SolicitudReasonCode}
-            onChange={(e) => setSolicitudReasonCode(e.target.value)}
-            placeholder='Ej: "Confirmación diagnóstica" o "system|code|display"'
-            required
-          />
+           <label>Reason (SNOMED)</label>
+       
+             <select
+               value={SolicitudReasonCode}
+               onChange={(e) => setSolicitudReasonCode(e.target.value)}
+             >
+               <option value="">Seleccione...</option>
+
+               {REASON_OPTIONS.map((o) => (
+                 <option key={o.code} value={o.code}>
+                   {o.code} — {o.display}
+                 </option>
+               ))}
+             </select>
 
           <label>specimen</label>
           <input
@@ -122,6 +154,104 @@ export default function SolicitudForm({
           />
         </div>
       </fieldset>
+
+{/* ===== Sección Muestra (Specimen / r2bo-muestra-biopsia) ===== */}
+<div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid #e5e7eb" }}>
+  <h3 style={{ margin: "0 0 10px 0" }}>Muestra</h3>
+
+  {/* Subject NO se agrega: usará el mismo Patient/{currentPatient.id} de Solicitud */}
+
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+    <div>
+      <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>receivedTime (Obligatorio)</label>
+      <input
+        type="datetime-local"
+        value={MuestraReceivedTime}
+        onChange={(e) => setMuestraReceivedTime(e.target.value)}
+        style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd" }}
+      />
+    </div>
+
+    <div>
+      <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
+        Colección: collection.collectedDateTime (Obligatorio)
+      </label>
+      <input
+        type="datetime-local"
+        value={MuestraCollectedDateTime}
+        onChange={(e) => setMuestraCollectedDateTime(e.target.value)}
+        style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd" }}
+      />
+    </div>
+  </div>
+
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+    <div>
+      <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
+        method (Obligatorio) — (por ahora texto/código)
+      </label>
+      <input
+        type="text"
+        placeholder="method (ej: código o texto)"
+        value={MuestraMethod}
+        onChange={(e) => setMuestraMethod(e.target.value)}
+        style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd" }}
+      />
+      <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
+        Extensión de method (según perfil): la modelamos como texto por ahora.
+      </div>
+      <label style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
+        Extensión de method (Tipo de procedimiento de biopsia)
+      </label>
+      
+      <select
+        value={MuestraMethodExt}
+        onChange={(e) => setMuestraMethodExt(e.target.value)}
+        style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", marginTop: 6 }}
+      >
+        <option value="">Seleccione...</option>
+        {TIPO_PROCED_BIOPSIA_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div>
+      <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
+        bodySite (Obligatorio) — (por ahora texto/código)
+      </label>
+      <input
+        type="text"
+        placeholder="bodySite (ej: código o texto)"
+        value={MuestraBodySite}
+        onChange={(e) => setMuestraBodySite(e.target.value)}
+        style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd" }}
+      />
+      <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
+        Extensión de bodySite (según perfil): la modelamos como texto por ahora.
+      </div>
+<label style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
+  Extensión de bodySite (Laterality)
+</label>
+
+       <select
+         value={MuestraBodySiteExt}
+         onChange={(e) => setMuestraBodySiteExt(e.target.value)}
+         style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1px solid #ddd", marginTop: 6 }}
+       >
+         <option value="">Seleccione...</option>
+         {LATERALITY_OPTIONS.map((o) => (
+           <option key={o.value} value={o.value}>
+             {o.label}
+           </option>
+         ))}
+       </select>
+    </div>
+  </div>
+  
+</div>
 
       {/* Preview JSON */}
       {jsonSolicitud && (
@@ -138,6 +268,30 @@ export default function SolicitudForm({
 
           <pre style={{ marginTop: 10, background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
             {JSON.stringify(jsonSolicitud, null, 2)}
+          </pre>
+        </div>
+      )}
+      
+      <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center" }}>
+        <button type="button" onClick={() => onBuildMuestra?.()}>
+          Generar JSON Muestra
+        </button>
+      
+        {jsonMuestra && (
+          <button
+            type="button"
+            onClick={() => navigator.clipboard?.writeText(JSON.stringify(jsonMuestra, null, 2))}
+          >
+            Copiar JSON Muestra
+          </button>
+        )}
+      </div>
+      
+      {jsonMuestra && (
+        <div style={{ marginTop: 12 }}>
+          <strong>JSON Muestra (Specimen)</strong>
+          <pre style={{ marginTop: 10, background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 12, overflow: "auto" }}>
+            {JSON.stringify(jsonMuestra, null, 2)}
           </pre>
         </div>
       )}
